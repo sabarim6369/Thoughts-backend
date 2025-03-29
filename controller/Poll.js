@@ -85,22 +85,18 @@ exports.getallpoll = async (req, res) => {
                 : -1; // If the user has not voted, set -1
 
             // Process poll options with percentages and mark voted option
-            const optionsWithPercentages = poll.options.map((option, index) => {
-                const percentage = totalVotes > 0 ? ((option.votes / totalVotes) * 100).toFixed(2) : 0;
-                return {
-                    text: option.text,
-                    votes: percentage,
-                    marked: index === userVotedOptionIndex // Mark option if user voted
-                };
-            });
-
+            const optionsWithVotes = poll.options.map((option, index) => ({
+              text: option.text,
+              votes: option.votes, // Set total votes instead of percentage
+              marked: index === userVotedOptionIndex // Mark option if user voted
+            }));
             const randomProfileImage = profileImages[Math.floor(Math.random() * profileImages.length)];
 
             return {
                 id: poll._id.toString(),
                 user: poll.createdBy.username,
                 question: poll.question,
-                options: optionsWithPercentages,
+                options: optionsWithVotes,
                 profileImage: randomProfileImage,
                 userid: poll.createdBy._id
             };

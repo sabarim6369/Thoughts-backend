@@ -1,4 +1,5 @@
 const User = require("../models/userschema"); // Replace with the correct path
+const Poll = require("../models/pollschema");
 
 exports.sendFriendRequest = async (req, res) => {
   console.log(req.body)
@@ -36,7 +37,6 @@ console.log("second")
 };
 
 
-// Accept Friend Request
 exports.acceptFriendRequest = async (req, res) => {
   try {
       const { userId, requesterId } = req.body;
@@ -49,16 +49,15 @@ exports.acceptFriendRequest = async (req, res) => {
           return res.status(404).json({ message: "User not found" });
       }
 
-      // Check if request exists
       if (!user.friendRequests.includes(requesterId)) {
           return res.status(400).json({ message: "No friend request found" });
       }
-
-      // Add each other to friends list
+      if (user.friends.includes(requesterId)) {
+        return res.status(400).json({ message: "Already friends" });
+    }
       user.friends.push(requesterId);
       requester.friends.push(userId);
 
-      // Remove from friendRequests list
       user.friendRequests = user.friendRequests.filter(id => id.toString() !== requesterId);
 
       await user.save();
@@ -132,12 +131,40 @@ exports.getFriends = async (req, res) => {
         // Separate friends who have sharedPolls
         const friendsWithSharedPolls = user.friends.filter(friend => friend.sharedPolls.length > 0);
         console.log("😍😍😍😍😍",friendsWithSharedPolls)
+        const totalPolls = await Poll.countDocuments({ createdBy: userId });
+console.log("🤮🤮🤮",totalPolls)
         res.status(200).json({
             friends: user.friends, 
             friendsWithSharedPolls,  
-            user
+            user,
+            totalPolls
         });
     } catch (error) {
         res.status(500).json({ message: "Error fetching friends list", error });
+    }
+};
+exports.getSuggestedFriends = async (req, res) => {
+    console.log("🔍 Fetching Suggested Friends 🔍");
+    try {
+      const { userId } = req.params;
+
+      const user = await User.findById(userId).populate("friends", "id");
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const friendIds = user.friends.map((friend) => friend._id);
+
+      const suggestedFriends = await User.find({
+        _id: { $nin: [...friendIds, userId] }, 
+      }).select("username email avatar");
+
+      console.log("✅ Suggested Friends:", suggestedFriends);
+      res.status(200).json({ suggestedFriends });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ message: "Error fetching suggested friends", error });
     }
 };
