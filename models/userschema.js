@@ -14,6 +14,7 @@ const UserSchema = new mongoose.Schema({
     sharedPersonId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, 
     sharedAt: { type: Date, default: Date.now } 
   }],
+  status: { type: String, enum: ["active", "inactive"], default: "active" },
   createdAt: { type: Date, default: Date.now },
 });
 

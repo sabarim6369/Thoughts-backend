@@ -55,7 +55,7 @@ exports.votePoll = async (req, res) => {
         res.status(200).json(polls);
     } catch (error) {
         console.error("Error fetching polls:", error);
-        res.status(500).json({ message: "Error fetching polls." });
+        res.status(400).json({ message: "Error fetching polls." });
     }
   };
 exports.getallpoll = async (req, res) => {
@@ -68,7 +68,7 @@ exports.getallpoll = async (req, res) => {
 
         const polls = await Poll.find({ createdBy: { $ne: userObjectId } })
             .populate('createdBy', '_id username email phoneNumber dob friends');
-
+console.log("❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥")
         console.log(polls);
 
         const profileImages = [

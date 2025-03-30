@@ -4,15 +4,43 @@ const User = require("../models/userschema");
 const nodemailer = require("nodemailer");
 
 const otpStorage = new Map(); // Temporary storage for OTPs
-
 exports.signup = async (req, res) => {
   try {
     const { username, email, password, phoneNumber } = req.body;
 
-    if (!username || !email || !password || !phoneNumber ) {
+    if (!username || !email || !password || !phoneNumber) {
       return res.status(400).json({ error: "Please provide all fields." });
     }
 
+    // Check if username or email already exists
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }],
+    });
+
+    if (existingUser) {
+      if (existingUser.username === username) {
+        return res.status(400).json({ error: "Username already exists. Please choose another." });
+      }
+      if (existingUser.email === email) {
+        if (existingUser.status === "active") {
+          return res.status(400).json({ error: "Email already exists. Please log in." });
+        } else {
+          existingUser.username = username;
+          existingUser.password = await bcrypt.hash(password, 10);
+          existingUser.phoneNumber = phoneNumber;
+          existingUser.status = "active";
+
+          existingUser.friends = [];
+          existingUser.friendRequests = [];
+          existingUser.sharedPolls = [];
+
+          await existingUser.save();
+          return res.status(200).json({ message: "Account reactivated successfully." });
+        }
+      }
+    }
+
+    // If user does not exist, create a new one
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new User({
@@ -20,35 +48,74 @@ exports.signup = async (req, res) => {
       email,
       password: hashedPassword,
       phoneNumber,
-    
+      status: "active", // Default status is active
     });
 
     await newUser.save();
-    res.status(201).json({ message: "User created successfully" });
+    res.status(201).json({ message: "User created successfully." });
   } catch (err) {
     console.error("Error during signup:", err);
-    res.status(500).json({ error: err.message });
+    
+    if (err.code === 11000) {
+      return res.status(400).json({ error: "Duplicate key error: This username or email already exists." });
+    }
+    
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 
 exports.login = async (req, res) => {
   try {
     const { email, password, rememberMe } = req.body;
     const user = await User.findOne({ email });
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+    // If the user is not found or is inactive, return "User not found" for security reasons
+    if (!user || user.status !== "active") {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+    if (!isMatch) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     const expiresIn = rememberMe ? "5d" : "1d";
     const token = jwt.sign({ userId: user._id }, "secretkey", { expiresIn });
 
     res.status(200).json({ token, userId: user._id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Error during login:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+
+exports.deleteaccount = async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required." });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { status: "inactive" }, // Setting status to inactive instead of deleting
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    res.status(200).json({ message: "Account deactivated successfully." });
+  } catch (err) {
+    console.error("Error deactivating account:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 
 exports.editdetails = async (req, res) => {
   try {
