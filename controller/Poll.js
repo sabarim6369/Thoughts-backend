@@ -203,6 +203,13 @@ exports.deletePoll = async (req, res) => {
       return res.status(404).json({ message: "Poll not found" });
     }
 
+    // Remove the poll from sharedPolls in all users
+    await User.updateMany(
+      { "sharedPolls.pollId": pollId },
+      { $pull: { sharedPolls: { pollId } } }
+    );
+
+    // Delete the poll itself
     await Poll.findByIdAndDelete(pollId);
 
     res.status(200).json({ message: "Poll deleted successfully" });
@@ -211,3 +218,4 @@ exports.deletePoll = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
