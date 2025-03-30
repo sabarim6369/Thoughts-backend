@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const friendController = require("../controller/friendController");
+const friendController = require("../controller/friendcontroller");
 
 router.post("/sendRequest", friendController.sendFriendRequest);
 router.post("/acceptRequest", friendController.acceptFriendRequest);
