@@ -194,3 +194,20 @@ exports.getPollsByIds = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+exports.deletePoll = async (req, res) => {
+  try {
+    const { pollId } = req.params;
+
+    const poll = await Poll.findById(pollId);
+    if (!poll) {
+      return res.status(404).json({ message: "Poll not found" });
+    }
+
+    await Poll.findByIdAndDelete(pollId);
+
+    res.status(200).json({ message: "Poll deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting poll:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
