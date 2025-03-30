@@ -4,9 +4,11 @@ const User = require("../models/userschema");
 const nodemailer = require("nodemailer");
 
 const otpStorage = new Map(); // Temporary storage for OTPs
+
 exports.signup = async (req, res) => {
   try {
     const { username, email, password, phoneNumber } = req.body;
+    console.log(req.body)
 
     if (!username || !email || !password || !phoneNumber) {
       return res.status(400).json({ error: "Please provide all fields." });
