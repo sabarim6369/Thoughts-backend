@@ -6,15 +6,19 @@ const authRoutes = require("./router/auth");
 const pollRoutes = require("./router/poll");
 const friendRoutes = require("./router/friend");
 
+const fileUpload = require("express-fileupload");
 dotenv.config();
 
 const app = express();
+app.use(fileUpload());
 
-// Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use("/uploads", express.static("uploads"));
+
 app.use(cors());
 
-// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/poll", pollRoutes);
 app.use("/api/friend", friendRoutes);

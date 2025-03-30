@@ -7,6 +7,7 @@ const UserSchema = new mongoose.Schema({
   phoneNumber: { type: String, required: true },
   dob: { type: Date },
   bio:{type:String},
+  profilePic: { type: String, default: "" },
   friends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], 
   friendRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], 
   sharedPolls: [{

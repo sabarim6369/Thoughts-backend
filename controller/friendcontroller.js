@@ -36,6 +36,38 @@ console.log("second")
   }
 };
 
+exports.unfollowFriend = async (req, res) => {
+    try {
+        const { senderId, receiverId } = req.body;
+
+        if (!senderId || !receiverId) {
+            return res.status(400).json({ message: "Sender and receiver IDs are required" });
+        }
+
+        const sender = await User.findById(senderId);
+        const receiver = await User.findById(receiverId);
+
+        if (!sender || !receiver) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        if (!receiver.friends.includes(senderId)) {
+            return res.status(400).json({ message: "Not friends" });
+        }
+
+        receiver.friends = receiver.friends.filter(id => id.toString() !== senderId);
+        await receiver.save();
+
+        // Remove receiverId from sender's friends list
+        sender.friends = sender.friends.filter(id => id.toString() !== receiverId);
+        await sender.save();
+
+        res.status(200).json({ message: "Unfollowed successfully" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error unfollowing friend", error });
+    }
+};
 
 exports.acceptFriendRequest = async (req, res) => {
   try {

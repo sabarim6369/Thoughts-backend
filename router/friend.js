@@ -3,6 +3,7 @@ const router = express.Router();
 const friendController = require("../controller/friendcontroller");
 
 router.post("/sendRequest", friendController.sendFriendRequest);
+router.post("/unfollow", friendController.unfollowFriend);
 router.post("/acceptRequest", friendController.acceptFriendRequest);
 router.post("/rejectRequest", friendController.rejectFriendRequest);
 router.get("/requests/:userId", friendController.getFriendRequests);

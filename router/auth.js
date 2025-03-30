@@ -1,5 +1,5 @@
 const express = require("express");
-const { signup, login,editdetails,sendOTP,verifyOTP,deleteaccount } = require("../controller/Auth");
+const { signup, login,editdetails,sendOTP,verifyOTP,deleteaccount,changePassword,uploadProfilePic,resetPassword } = require("../controller/Auth");
 
 const router = express.Router();
 
@@ -9,4 +9,8 @@ router.post("/edit", editdetails);
 router.post("/send-otp", sendOTP);
 router.post("/verify-otp", verifyOTP);
 router.post("/deleteaccount", deleteaccount);
+router.post("/change-password", changePassword);
+router.post("/upload-profile-pic", uploadProfilePic);
+router.post("/reset-password", resetPassword);
+
 module.exports = router;

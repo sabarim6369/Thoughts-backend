@@ -147,35 +147,56 @@ exports.sharePoll = async (req, res) => {
   }
 };
 exports.getPollsByIds = async (req, res) => {
-  console.log(req.body);
+  console.log("😍😍😍😍",req.body)
   try {
-    const { pollIds, userId } = req.body; // Ensure userId is passed to check if the user voted
+    const { friendId, userId } = req.body; // Receive friendId and userId
 
-    if (!pollIds || !Array.isArray(pollIds) || pollIds.length === 0) {
-      return res.status(400).json({ message: "Invalid or missing poll IDs." });
+    if (!friendId || !userId) {
+      return res.status(400).json({ message: "Friend ID and User ID are required." });
     }
 
+    const user = await User.findById(userId).populate("sharedPolls.pollId");
+
+    if (!user) {
+      console.log("🐦‍🔥🐦‍🔥🐦‍🔥")
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Step 2: Filter sharedPolls where `sharedPersonId` matches `friendId`
+    const sharedPollsByFriend = user.sharedPolls.filter(
+      (shared) => shared.sharedPersonId.toString() === friendId
+    );
+
+    if (!sharedPollsByFriend.length) {
+      console.log("🚬🚬🚬🚬🚬")
+      return res.status(404).json({ message: "No polls shared by this friend." });
+    }
+
+    // Step 3: Extract pollIds
+    const pollIds = sharedPollsByFriend.map((shared) => shared.pollId._id);
+
+    // Step 4: Fetch actual polls using pollIds
     const polls = await Poll.find({ _id: { $in: pollIds } }).populate(
       "createdBy",
       "_id username email phoneNumber dob friends"
     );
 
     if (!polls.length) {
-      return res.status(404).json({ message: "No polls found for the provided IDs." });
+      return res.status(404).json({ message: "No polls found for the provided friend." });
     }
 
-    const formattedPolls = polls.map(poll => {
-      const userVotedOptionIndex = userId && poll.votedUsers.includes(userId) 
-        ? poll.options.findIndex(option => option.votes > 0) 
-        : -1; 
+    // Step 5: Format response
+    const formattedPolls = polls.map((poll) => {
+      const userVotedOptionIndex =
+        userId && poll.votedUsers.includes(userId)
+          ? poll.options.findIndex((option) => option.votes > 0)
+          : -1;
 
       const optionsWithVotes = poll.options.map((option, index) => ({
         text: option.text,
-        votes: option.votes, // Set total votes instead of percentage
-        marked: index === userVotedOptionIndex // Mark option if user voted
+        votes: option.votes,
+        marked: index === userVotedOptionIndex, // Mark option if user voted
       }));
-
-      console.log(optionsWithVotes);
 
       return {
         id: poll._id.toString(),
@@ -183,14 +204,13 @@ exports.getPollsByIds = async (req, res) => {
         question: poll.question,
         options: optionsWithVotes,
         createdBy: poll.createdBy._id,
-        userid: poll.createdBy._id
+        userid:poll.createdBy._id
       };
     });
 
-    console.log(formattedPolls);
     res.status(200).json({ polls: formattedPolls });
   } catch (err) {
-    console.error("Error fetching polls by IDs:", err);
+    console.error("Error fetching polls shared by friend:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -219,3 +239,35 @@ exports.deletePoll = async (req, res) => {
   }
 };
 
+
+exports.getSharedPolls = async (req, res) => {
+  try {
+      const { userId } = req.params;
+
+      const user = await User.findById(userId)
+          .populate({
+              path: "sharedPolls.pollId sharedPolls.sharedPersonId",
+              select: "title question sharedAt username email"
+          });
+
+      if (!user) {
+          return res.status(404).json({ message: "User not found" });
+      }
+
+      console.log("👼👼👼👼👼 Before filtering");
+      console.log(user.sharedPolls);
+
+      // Remove duplicates based on sharedPersonId
+      const uniqueSharedPolls = user.sharedPolls.filter((poll, index, self) =>
+          index === self.findIndex((p) => p.sharedPersonId.equals(poll.sharedPersonId))
+      );
+
+      console.log("😍😍😍😍😍 After filtering");
+      console.log(uniqueSharedPolls);
+
+      res.status(200).json({ sharedPolls: uniqueSharedPolls });
+  } catch (error) {
+      console.error("Error fetching shared polls:", error);
+      res.status(500).json({ message: "Error fetching shared polls", error });
+  }
+};

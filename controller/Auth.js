@@ -2,9 +2,19 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/userschema");
 const nodemailer = require("nodemailer");
+const multer=require("multer");
+const path=require("path");
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/"); // Store images in "uploads" folder
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  },
+});
+const upload = multer({ storage: storage }).single("profilePic");
 
-const otpStorage = new Map(); // Temporary storage for OTPs
-
+// const otpStorage = new Map(); 
 exports.signup = async (req, res) => {
   try {
     const { username, email, password, phoneNumber } = req.body;
@@ -158,22 +168,18 @@ const transporter = nodemailer.createTransport({
     pass: "yifi jcyj uawz wmdv",
   },
 });
-
 exports.sendOTP = async (req, res) => {
-  console.log(req.body)
   try {
     const { email } = req.body;
     const user = await User.findOne({ email });
-console.log("hello",req.body)
-    // if (!user) {
-    //   console.log("nouser")
-    //   return res.status(404).json({ message: "User not found" });
-    // }
-    console.log("1")
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: "Email not found" });
+    }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    otpStorage.set(email, otp);
-    console.log("2")
+    
+
 
     const mailOptions = {
       from: "sabarim6369@gmail.com",
@@ -183,29 +189,154 @@ console.log("hello",req.body)
     };
 
     await transporter.sendMail(mailOptions);
-    console.log("suiccess")
-    res.status(200).json({ success: true, message: "OTP sent successfully." });
+
+    return res.status(200).json({ success: true, message: "OTP sent successfully.", otp });
   } catch (err) {
     console.error("Error sending OTP:", err);
-    res.status(500).json({ error: "Error sending OTP. Try again later." });
+    return res.status(500).json({ success: false, message: "Error sending OTP. Try again later." });
   }
 };
 
 exports.verifyOTP = async (req, res) => {
   try {
-    const { email, otp, newPassword } = req.body;
+    const { email, otp } = req.body;
 
-    if (!otpStorage.has(email) || otpStorage.get(email) !== otp) {
-      return res.status(400).json({ error: "Invalid OTP or expired." });
+    // const otpDetails = otpStorage.get(email);
+    if (!otpDetails) {
+      return res.status(400).json({ error: "OTP not sent." });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await User.findOneAndUpdate({ email }, { password: hashedPassword });
+    // Check if OTP exists and matches
+    if (otpDetails.otp !== otp) {
+      return res.status(400).json({ error: "Invalid OTP." });
+    }
 
-    otpStorage.delete(email);
-    res.status(200).json({ success: true, message: "Password reset successfully!" });
+    // Check if OTP has expired
+    if (Date.now() > otpDetails.expiresAt) {
+      // otpStorage.delete(email); // Clean up expired OTP
+      return res.status(400).json({ error: "OTP expired." });
+    }
+
+    // OTP is valid and not expired, so delete it from storage
+    // otpStorage.delete(email);
+
+    res.status(200).json({ success: true, message: "OTP verified successfully!" });
   } catch (err) {
     console.error("Error verifying OTP:", err);
     res.status(500).json({ error: "Error verifying OTP. Try again later." });
+  }
+};
+
+
+
+exports.changePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword, userId } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ error: "Both old and new passwords are required." });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: "Incorrect old password." });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    return res.status(200).json({ success: true, message: "Password changed successfully." });
+  } catch (err) {
+    console.error("Error changing password:", err);
+    return res.status(500).json({ error: "Internal Server Error. Please try again later." });
+  }
+};
+const axios = require('axios');
+const fs = require('fs');
+
+const cloudinary = require("cloudinary").v2;
+// const User = require("../models/userschema");
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name:"dsq0ebnj6",
+  api_key:"693565251951853",
+  api_secret:"Fk3XYttHytn_Dy_J2t6hyDtYigM",
+});
+
+
+// Function to Upload File to Cloudinary
+const uploadToCloudinary = async (file) => {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.upload(file.tempFilePath, { folder: "profile_pics" }, (error, result) => {
+      if (error) return reject(error);
+      resolve(result.secure_url);
+    });
+  });
+};
+exports.uploadProfilePic = async (req, res) => {
+  console.log("Request Body:", req.body);  // To check the URI
+  const { uri, userId } = req.body;  // Get URI and userId from the request
+
+  if (!uri) {
+    return res.status(400).json({ message: "No image URI provided" });
+  }
+
+  try {
+    // Handle the 'file://' URI for local files
+    const filePath = uri.replace('file://', '');  // Strip off the 'file://' prefix
+
+    // Check if file exists at the given path
+    if (!fs.existsSync(filePath)) {
+      console.log("🚬🚬🚬")
+      return res.status(400).json({ message: "File does not exist" });
+    }
+
+    // Upload the file to Cloudinary
+    const imageUrl = await uploadToCloudinary(filePath);
+
+    // Update user's profile picture in the database (assuming you have User model)
+    const user = await User.findByIdAndUpdate(userId, { profilePic: imageUrl }, { new: true });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "Profile picture updated", profilePic: user.profilePic });
+
+  } catch (error) {
+    console.error("Error uploading profile picture:", error);
+    res.status(500).json({ message: "Internal server error", error });
+  }
+};
+
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email  || !newPassword) {
+      return res.status(400).json({ error: "All fields are required." });
+    }
+
+  
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    // Hash the new password and update the user's password
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.status(200).json({ success: true, message: "Password reset successfully!" });
+  } catch (err) {
+    console.error("Error resetting password:", err);
+    res.status(500).json({ error: "Internal Server Error. Please try again later." });
   }
 };
