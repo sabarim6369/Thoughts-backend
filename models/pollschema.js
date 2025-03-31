@@ -8,8 +8,17 @@ const PollSchema = new mongoose.Schema({
       votes: { type: Number, default: 0 },
     },
   ],
-  votedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" },], // Track users who voted
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  votedUsers: [
+    {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      option: { type: Number, required: true },
+    },
+  ], 
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -22,6 +22,7 @@ exports.createPoll = async (req, res) => {
 exports.votePoll = async (req, res) => {
   try {
     const { pollId, userId, optionIndex } = req.body;
+    console.log(req.body)
     const poll = await Poll.findById(pollId);
 
     if (!poll) return res.status(404).json({ message: "Poll not found" });
@@ -36,16 +37,14 @@ exports.votePoll = async (req, res) => {
       return res.status(400).json({ message: "Invalid option" });
     }
 
-    // Get the voted option
     const votedOption = poll.options[optionIndex].text; 
 
     // Update vote count and user list
     poll.options[optionIndex].votes += 1;
-    poll.votedUsers.push(userId);
+    poll.votedUsers.push({userId:userId,option:optionIndex})
 
     await poll.save();
 
-    // Fetch poll owner's details
     const pollOwner = await User.findById(poll.createdBy);
     const voter = await User.findById(userId); // Fetch the user who voted
 
@@ -85,24 +84,25 @@ exports.votePoll = async (req, res) => {
 
         const userObjectId = new mongoose.Types.ObjectId(userId);
 
+        // Fetch all polls except the ones created by the user
         const polls = await Poll.find({ createdBy: { $ne: userObjectId } })
             .populate('createdBy', '_id username email phoneNumber dob friends profilePic');
-        
+
         console.log("❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥");
         console.log(polls);
 
         const formattedPolls = polls.map(poll => {
             const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
 
-            const userVotedOptionIndex = poll.votedUsers.includes(userObjectId) 
-                ? poll.options.findIndex(option => option.votes > 0) 
-                : -1; // If the user has not voted, set -1
+            // Find the specific option the user voted for
+            const userVote = poll.votedUsers.find(vote => vote.userId.toString() === userId);
+            const userVotedOptionIndex = userVote ? userVote.option : -1;
 
             // Process poll options with total votes and marked option
             const optionsWithVotes = poll.options.map((option, index) => ({
               text: option.text,
               votes: option.votes,
-              marked: index === userVotedOptionIndex
+              marked: index === userVotedOptionIndex, // Mark the option the user voted for
             }));
 
             return {
@@ -110,7 +110,8 @@ exports.votePoll = async (req, res) => {
                 user: poll.createdBy.username,
                 question: poll.question,
                 options: optionsWithVotes,
-                profileImage: poll.createdBy.profilePic || "https://cdn-icons-png.flaticon.com/512/149/149071.png", // Use dynamic profile pic
+                userVotedOptionIndex, // Send the user's voted option index
+                profileImage: poll.createdBy.profilePic || "https://cdn-icons-png.flaticon.com/512/149/149071.png",
                 userid: poll.createdBy._id
             };
         });
@@ -122,6 +123,7 @@ exports.votePoll = async (req, res) => {
         res.status(500).json({ message: "Error fetching polls." });
     }
 };
+
 exports.getSinglePoll = async (req, res) => {
     console.log("Fetching a single poll...");
     try {
@@ -210,9 +212,9 @@ exports.sharePoll = async (req, res) => {
   }
 };
 exports.getPollsByIds = async (req, res) => {
-  console.log("😍😍😍😍",req.body)
+  console.log("😍😍😍😍", req.body);
   try {
-    const { friendId, userId } = req.body; // Receive friendId and userId
+    const { friendId, userId } = req.body;
 
     if (!friendId || !userId) {
       return res.status(400).json({ message: "Friend ID and User ID are required." });
@@ -221,44 +223,40 @@ exports.getPollsByIds = async (req, res) => {
     const user = await User.findById(userId).populate("sharedPolls.pollId");
 
     if (!user) {
-      console.log("🐦‍🔥🐦‍🔥🐦‍🔥")
+      console.log("🐦‍🔥🐦‍🔥🐦‍🔥");
       return res.status(404).json({ message: "User not found." });
     }
 
-    // Step 2: Filter sharedPolls where `sharedPersonId` matches `friendId`
     const sharedPollsByFriend = user.sharedPolls.filter(
       (shared) => shared.sharedPersonId.toString() === friendId
     );
 
     if (!sharedPollsByFriend.length) {
-      console.log("🚬🚬🚬🚬🚬")
+      console.log("🚬🚬🚬🚬🚬");
       return res.status(404).json({ message: "No polls shared by this friend." });
     }
 
-    // Step 3: Extract pollIds
     const pollIds = sharedPollsByFriend.map((shared) => shared.pollId._id);
 
-    // Step 4: Fetch actual polls using pollIds
     const polls = await Poll.find({ _id: { $in: pollIds } }).populate(
       "createdBy",
-      "_id username email phoneNumber dob friends"
+      "_id username email phoneNumber dob friends profilePic"
     );
 
     if (!polls.length) {
       return res.status(404).json({ message: "No polls found for the provided friend." });
     }
 
-    // Step 5: Format response
     const formattedPolls = polls.map((poll) => {
-      const userVotedOptionIndex =
-        userId && poll.votedUsers.includes(userId)
-          ? poll.options.findIndex((option) => option.votes > 0)
-          : -1;
+      const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
+
+      const userVote = poll.votedUsers.find(vote => vote.userId.toString() === userId);
+      const userVotedOptionIndex = userVote ? userVote.option : -1;
 
       const optionsWithVotes = poll.options.map((option, index) => ({
         text: option.text,
         votes: option.votes,
-        marked: index === userVotedOptionIndex, // Mark option if user voted
+        marked: index === userVotedOptionIndex,
       }));
 
       return {
@@ -266,17 +264,19 @@ exports.getPollsByIds = async (req, res) => {
         user: poll.createdBy.username,
         question: poll.question,
         options: optionsWithVotes,
-        createdBy: poll.createdBy._id,
-        userid:poll.createdBy._id
+        userVotedOptionIndex,
+        profileImage: poll.createdBy.profilePic || "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+        userid: poll.createdBy._id,
       };
     });
-
-    res.status(200).json({ polls: formattedPolls });
+console.log("😎😎😎😎😎😎",formattedPolls)
+    res.status(200).json({polls:formattedPolls});
   } catch (err) {
     console.error("Error fetching polls shared by friend:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: "Error fetching polls." });
   }
 };
+
 exports.deletePoll = async (req, res) => {
   try {
     const { pollId } = req.params;
