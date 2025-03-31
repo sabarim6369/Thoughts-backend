@@ -15,6 +15,16 @@ const UserSchema = new mongoose.Schema({
     sharedPersonId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, 
     sharedAt: { type: Date, default: Date.now } 
   }],
+  notifications: [
+    {
+      type: { type: String, enum: ["vote", "friendRequest", "message"] },
+      message: { type: String },
+      fromUser: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      pollId: { type: mongoose.Schema.Types.ObjectId, ref: "Poll", default: null },
+      createdAt: { type: Date, default: Date.now },
+      isRead: { type: Boolean, default: false },
+    },
+  ],
   status: { type: String, enum: ["active", "inactive"], default: "active" },
   createdAt: { type: Date, default: Date.now },
 });

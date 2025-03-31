@@ -1,18 +1,19 @@
+const express = require("express");
+const app = express();
+
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/userschema");
 const nodemailer = require("nodemailer");
-const multer=require("multer");
-const path=require("path");
+const multer = require("multer");
+const path = require("path");
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/"); // Store images in "uploads" folder
-  },
+  destination: "./uploads/profilePics", // Directory to store uploaded images
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
   },
 });
-const upload = multer({ storage: storage }).single("profilePic");
+const upload = multer({ storage });
 
 // const otpStorage = new Map(); 
 exports.signup = async (req, res) => {
@@ -256,8 +257,8 @@ exports.changePassword = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error. Please try again later." });
   }
 };
-const axios = require('axios');
 const fs = require('fs');
+app.use(express.urlencoded({ extended: true }));
 
 const cloudinary = require("cloudinary").v2;
 // const User = require("../models/userschema");
@@ -270,37 +271,36 @@ cloudinary.config({
 });
 
 
-// Function to Upload File to Cloudinary
-const uploadToCloudinary = async (file) => {
+const uploadToCloudinary = async (filePath) => {
   return new Promise((resolve, reject) => {
-    cloudinary.uploader.upload(file.tempFilePath, { folder: "profile_pics" }, (error, result) => {
-      if (error) return reject(error);
+    cloudinary.uploader.upload(filePath, { folder: "profile_pics" }, (error, result) => {
+      if (error) {
+        console.error("Cloudinary Upload Error:", error);
+        return reject(error);
+      }
+      // ✅ Delete local file after uploading
+      fs.unlinkSync(filePath);
       resolve(result.secure_url);
     });
   });
 };
 exports.uploadProfilePic = async (req, res) => {
-  console.log("Request Body:", req.body);  // To check the URI
-  const { uri, userId } = req.body;  // Get URI and userId from the request
-
-  if (!uri) {
-    return res.status(400).json({ message: "No image URI provided" });
-  }
-
   try {
-    // Handle the 'file://' URI for local files
-    const filePath = uri.replace('file://', '');  // Strip off the 'file://' prefix
-
-    // Check if file exists at the given path
-    if (!fs.existsSync(filePath)) {
-      console.log("🚬🚬🚬")
-      return res.status(400).json({ message: "File does not exist" });
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
     }
+console.log(req.body)
+    const userId = req.body.userId;
+    const filePath = req.file.path; // Local file path
 
-    // Upload the file to Cloudinary
+    console.log("Uploading to Cloudinary:", filePath);
+
+    // ✅ Upload file to Cloudinary with the correct file path
     const imageUrl = await uploadToCloudinary(filePath);
 
-    // Update user's profile picture in the database (assuming you have User model)
+    console.log("Cloudinary URL:", imageUrl);
+
+    // ✅ Save Cloudinary URL in database
     const user = await User.findByIdAndUpdate(userId, { profilePic: imageUrl }, { new: true });
 
     if (!user) {
@@ -316,6 +316,8 @@ exports.uploadProfilePic = async (req, res) => {
 };
 
 
+
+exports.uploadMiddleware = upload.single("profilePic"); 
 exports.resetPassword = async (req, res) => {
   try {
     const { email, newPassword } = req.body;
@@ -330,7 +332,6 @@ exports.resetPassword = async (req, res) => {
       return res.status(404).json({ error: "User not found." });
     }
 
-    // Hash the new password and update the user's password
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 

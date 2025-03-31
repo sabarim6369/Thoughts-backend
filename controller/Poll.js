@@ -41,6 +41,16 @@ exports.votePoll = async (req, res) => {
     poll.votedUsers.push(userId); // Add user to voted list
 
     await poll.save();
+    const pollOwner = await User.findById(poll.createdBy);
+    if (pollOwner) {
+      pollOwner.notifications.push({
+        type: "vote",
+        message: `Someone voted on your poll: "${poll.question}"`,
+        fromUser: userId,
+        pollId: pollId,
+      });
+      await pollOwner.save();
+    }
     res.status(200).json({ message: "Vote recorded" });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -67,7 +77,7 @@ exports.getallpoll = async (req, res) => {
         const userObjectId = new mongoose.Types.ObjectId(userId);
 
         const polls = await Poll.find({ createdBy: { $ne: userObjectId } })
-            .populate('createdBy', '_id username email phoneNumber dob friends');
+            .populate('createdBy', '_id username email phoneNumber dob friends profilePic');
 console.log("❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥")
         console.log(polls);
 

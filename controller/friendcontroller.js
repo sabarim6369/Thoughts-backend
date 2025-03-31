@@ -9,7 +9,9 @@ exports.sendFriendRequest = async (req, res) => {
       if (!senderId || !receiverId) {
           return res.status(400).json({ message: "Sender and receiver IDs are required" });
       }
-
+      if (senderId === receiverId) {
+        return res.status(400).json({ message: "You cannot send a friend request to yourself" });
+      }
       const sender = await User.findById(senderId);
       const receiver = await User.findById(receiverId);
       console.log(sender,receiver)
