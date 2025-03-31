@@ -126,20 +126,49 @@ exports.rejectFriendRequest = async (req, res) => {
 
 // Get Friend Requests
 exports.getFriendRequests = async (req, res) => {
-  try {
-      const { userId } = req.params;
-      console.log(req.params)
-      const user = await User.findById(userId).populate("friendRequests", "username email");
-
-      if (!user) {
+    try {
+        const { userId } = req.params;
+        console.log(req.params);
+        
+        const user = await User.findById(userId)
+          .populate("friendRequests", "username email")
+          .populate("notifications.fromUser", "username") // Populate fromUser for notifications
+          .populate("notifications.pollId", "title"); // Optional: Populate poll details
+    
+        if (!user) {
           return res.status(404).json({ message: "User not found" });
-      }
+        }
+    
+        // Format friend requests
+        const friendRequests = user.friendRequests.map(request => ({
+          id: request._id,
+          type: "friendRequest",
+          user: request.username,
+          message: "sent you a friend request",
+          status: "pending",
+          requesterId: request._id,
+        }));
+    
+        // Format notifications
+        const notifications = user.notifications
+        .filter(notification => !notification.isRead) // Get only unread notifications
+        .map(notification => ({
+          id: notification._id,
+          type: notification.type,
+          message: notification.message,
+          fromUser: notification.fromUser?.username || "Unknown",
+          pollId: notification.pollId ? notification.pollId._id : null,
+          isRead: notification.isRead,
+          createdAt: notification.createdAt
+        }));
 
-      res.status(200).json({ friendRequests: user.friendRequests });
-  } catch (error) {
-      res.status(500).json({ message: "Error fetching friend requests", error });
-  }
-};
+    
+        res.status(200).json({ friendRequests, notifications });
+      } catch (error) {
+        res.status(500).json({ message: "Error fetching data", error });
+      }
+  };
+  
 exports.getFriends = async (req, res) => {
     console.log("😍 Fetching Friends List 😍");
     try {

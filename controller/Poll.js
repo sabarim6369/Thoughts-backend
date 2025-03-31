@@ -19,7 +19,6 @@ exports.createPoll = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 exports.votePoll = async (req, res) => {
   try {
     const { pollId, userId, optionIndex } = req.body;
@@ -37,25 +36,35 @@ exports.votePoll = async (req, res) => {
       return res.status(400).json({ message: "Invalid option" });
     }
 
+    // Get the voted option
+    const votedOption = poll.options[optionIndex].text; 
+
+    // Update vote count and user list
     poll.options[optionIndex].votes += 1;
-    poll.votedUsers.push(userId); // Add user to voted list
+    poll.votedUsers.push(userId);
 
     await poll.save();
+
+    // Fetch poll owner's details
     const pollOwner = await User.findById(poll.createdBy);
-    if (pollOwner) {
+    const voter = await User.findById(userId); // Fetch the user who voted
+
+    if (pollOwner && voter) {
       pollOwner.notifications.push({
         type: "vote",
-        message: `Someone voted on your poll: "${poll.question}"`,
+        message: `${voter.username} voted for "${votedOption}" on your poll: "${poll.question}"`,
         fromUser: userId,
         pollId: pollId,
       });
       await pollOwner.save();
     }
+
     res.status(200).json({ message: "Vote recorded" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
+
 
   exports.getallpollofuser= async (req, res) => {
     try {

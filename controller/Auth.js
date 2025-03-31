@@ -341,3 +341,35 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error. Please try again later." });
   }
 };
+exports.markAsRead = async (req, res) => {
+  try {
+    const { notificationId, userId } = req.body;
+
+    // Find the user
+    console.log(req.body)
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Find the notification in the user's notifications array
+    const notification = user.notifications.find(
+      (notif) => notif._id.toString() === notificationId
+    );
+
+    if (!notification) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+
+    // Mark as read
+    notification.isRead = true;
+
+    // Save the user document
+    await user.save();
+
+    return res.status(200).json({ message: "Notification marked as read" });
+  } catch (error) {
+    console.error("Error marking notification as read:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
