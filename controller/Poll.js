@@ -68,7 +68,7 @@ exports.votePoll = async (req, res) => {
         res.status(400).json({ message: "Error fetching polls." });
     }
   };
-exports.getallpoll = async (req, res) => {
+  exports.getallpoll = async (req, res) => {
     console.log("Fetching polls...");
     try {
         const userId = req.params.userId;
@@ -78,14 +78,9 @@ exports.getallpoll = async (req, res) => {
 
         const polls = await Poll.find({ createdBy: { $ne: userObjectId } })
             .populate('createdBy', '_id username email phoneNumber dob friends profilePic');
-console.log("❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥")
+        
+        console.log("❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥");
         console.log(polls);
-
-        const profileImages = [
-            "https://randomuser.me/api/portraits/women/1.jpg",
-            "https://randomuser.me/api/portraits/men/1.jpg",
-            "https://randomuser.me/api/portraits/women/2.jpg",
-        ];
 
         const formattedPolls = polls.map(poll => {
             const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
@@ -94,20 +89,19 @@ console.log("❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥�
                 ? poll.options.findIndex(option => option.votes > 0) 
                 : -1; // If the user has not voted, set -1
 
-            // Process poll options with percentages and mark voted option
+            // Process poll options with total votes and marked option
             const optionsWithVotes = poll.options.map((option, index) => ({
               text: option.text,
-              votes: option.votes, // Set total votes instead of percentage
-              marked: index === userVotedOptionIndex // Mark option if user voted
+              votes: option.votes,
+              marked: index === userVotedOptionIndex
             }));
-            const randomProfileImage = profileImages[Math.floor(Math.random() * profileImages.length)];
 
             return {
                 id: poll._id.toString(),
                 user: poll.createdBy.username,
                 question: poll.question,
                 options: optionsWithVotes,
-                profileImage: randomProfileImage,
+                profileImage: poll.createdBy.profilePic || "https://cdn-icons-png.flaticon.com/512/149/149071.png", // Use dynamic profile pic
                 userid: poll.createdBy._id
             };
         });
@@ -119,6 +113,56 @@ console.log("❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥�
         res.status(500).json({ message: "Error fetching polls." });
     }
 };
+exports.getSinglePoll = async (req, res) => {
+    console.log("Fetching a single poll...");
+    try {
+        const { pollId } = req.params; // Get pollId from request params
+        const userId = req.query.userId; // Get userId from query params (for vote check)
+
+        console.log("Poll ID:", pollId);
+        console.log("User ID:", userId);
+
+        if (!pollId) {
+            return res.status(400).json({ message: "Poll ID is required." });
+        }
+
+        const poll = await Poll.findById(pollId).populate('createdBy', '_id username email phoneNumber dob friends profilePic');
+
+        if (!poll) {
+            return res.status(404).json({ message: "Poll not found." });
+        }
+
+        const userObjectId = userId ? new mongoose.Types.ObjectId(userId) : null;
+        const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
+
+        // Determine which option the user voted for (if they have voted)
+        const userVotedOptionIndex = userObjectId && poll.votedUsers.includes(userObjectId)
+            ? poll.options.findIndex(option => option.votes > 0) 
+            : -1;
+
+        const optionsWithVotes = poll.options.map((option, index) => ({
+            text: option.text,
+            votes: option.votes,
+            marked: index === userVotedOptionIndex // Mark only the option the user voted for
+        }));
+
+        const formattedPoll = {
+            id: poll._id.toString(),
+            user: poll.createdBy.username,
+            question: poll.question,
+            options: optionsWithVotes,
+            profileImage: poll.createdBy.profilePic || "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+            userid: poll.createdBy._id
+        };
+
+        console.log("🟢 Single Poll Response:", JSON.stringify(formattedPoll, null, 2));
+        res.status(200).json(formattedPoll);
+    } catch (err) {
+        console.error("Error fetching poll:", err);
+        res.status(500).json({ message: "Error fetching poll." });
+    }
+};
+
 
 exports.sharePoll = async (req, res) => {
   console.log(req.body);
@@ -257,7 +301,7 @@ exports.getSharedPolls = async (req, res) => {
       const user = await User.findById(userId)
           .populate({
               path: "sharedPolls.pollId sharedPolls.sharedPersonId",
-              select: "title question sharedAt username email"
+              select: "title question sharedAt username email profilePic"
           });
 
       if (!user) {

@@ -149,7 +149,7 @@ exports.getFriends = async (req, res) => {
         const user = await User.findById(userId)
             .populate({
                 path: "friends",
-                select: "username email sharedPolls",
+                select: "username email sharedPolls profilePic",
                 populate: {
                     path: "sharedPolls.pollId sharedPolls.sharedPersonId", // Populate poll details & shared person
                     select: "title question sharedAt username email" // Customize fields
@@ -192,7 +192,7 @@ exports.getSuggestedFriends = async (req, res) => {
 
       const suggestedFriends = await User.find({
         _id: { $nin: [...friendIds, userId] }, 
-      }).select("username email avatar");
+      }).select("username email profilePic");
 
       console.log("✅ Suggested Friends:", suggestedFriends);
       res.status(200).json({ suggestedFriends });
