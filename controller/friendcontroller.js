@@ -151,16 +151,16 @@ exports.getFriendRequests = async (req, res) => {
     
         // Format notifications
         const notifications = user.notifications
-        .filter(notification => !notification.isRead) // Get only unread notifications
-        .map(notification => ({
-          id: notification._id,
-          type: notification.type,
-          message: notification.message,
-          fromUser: notification.fromUser?.username || "Unknown",
-          pollId: notification.pollId ? notification.pollId._id : null,
-          isRead: notification.isRead,
-          createdAt: notification.createdAt
-        }));
+          .filter((notification) => !notification.isRead) // Get only unread notifications
+          .map((notification) => ({
+            id: notification._id,
+            type: notification.type,
+            message: notification.message,
+            fromUser: notification.fromUser?.username || "Unknown",
+            pollId: notification.pollId ? notification.pollId._id : null,
+            isRead: notification.isRead,
+            createdAt: notification.createdAt,
+          }));
 
     
         res.status(200).json({ friendRequests, notifications });
@@ -178,14 +178,14 @@ exports.getFriends = async (req, res) => {
         const user = await User.findById(userId)
             .populate({
                 path: "friends",
-                select: "username email sharedPolls profilePic",
+                select: "username email sharedPolls profilePic _id",
                 populate: {
                     path: "sharedPolls.pollId sharedPolls.sharedPersonId", // Populate poll details & shared person
                     select: "title question sharedAt username email" // Customize fields
                 }
             });
 
-        console.log(user);
+        // console.log(user);
 
         if (!user) {
             return res.status(404).json({ message: "User not found" });
@@ -193,7 +193,7 @@ exports.getFriends = async (req, res) => {
 
         // Separate friends who have sharedPolls
         const friendsWithSharedPolls = user.friends.filter(friend => friend.sharedPolls.length > 0);
-        console.log("😍😍😍😍😍",friendsWithSharedPolls)
+        // console.log("😍😍😍😍😍",friendsWithSharedPolls)
         const totalPolls = await Poll.countDocuments({ createdBy: userId });
 console.log("🤮🤮🤮",totalPolls)
         res.status(200).json({
@@ -209,25 +209,153 @@ console.log("🤮🤮🤮",totalPolls)
 exports.getSuggestedFriends = async (req, res) => {
     console.log("🔍 Fetching Suggested Friends 🔍");
     try {
-      const { userId } = req.params;
+        const { userId } = req.params;
 
-      const user = await User.findById(userId).populate("friends", "id");
+        const user = await User.findById(userId).populate("friends", "id");
 
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
 
-      const friendIds = user.friends.map((friend) => friend._id);
+        const friendIds = user.friends.map((friend) => friend._id);
 
-      const suggestedFriends = await User.find({
-        _id: { $nin: [...friendIds, userId] }, 
-      }).select("username email profilePic");
+        const suggestedFriends = await User.find({
+            _id: { $nin: [...friendIds, userId] }, 
+        }).select("username email profilePic friendRequests");
 
-      console.log("✅ Suggested Friends:", suggestedFriends);
-      res.status(200).json({ suggestedFriends });
+        // Add 'requested' flag if userId is in their friendRequests array
+        const formattedSuggestedFriends = suggestedFriends.map(friend => ({
+            ...friend.toObject(),
+            requested: friend.friendRequests.includes(userId)
+        }));
+
+        console.log("✅ Suggested Friends:", formattedSuggestedFriends);
+        res.status(200).json({ suggestedFriends: formattedSuggestedFriends });
     } catch (error) {
-      res
-        .status(500)
-        .json({ message: "Error fetching suggested friends", error });
+        res.status(500).json({ message: "Error fetching suggested friends", error });
     }
 };
+
+exports.chat = async (req, res) => {
+    try {
+      const { userId, chatWith, message } = req.body;
+  
+      console.log(req.body);
+  
+      if (!userId || !chatWith || !message.trim()) {
+        return res.status(400).json({ error: "All fields are required" });
+      }
+  
+      // Find user and check if chat exists
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+  
+      // Check if chat exists in user's chat list
+      let chatExists = user.chats.some(chat => chat.chatWith.toString() === chatWith);
+  
+      if (chatExists) {
+        // 🔹 Update existing chat with new message
+        await User.findOneAndUpdate(
+          { _id: userId, "chats.chatWith": chatWith },
+          {
+            $push: { "chats.$.messages": { text: message, createdAt: new Date(), isRead: false } },
+          },
+          { new: true }
+        );
+      } else {
+        // 🔹 Create new chat entry
+        await User.findByIdAndUpdate(
+          userId,
+          {
+            $push: {
+              chats: {
+                chatWith,
+                messages: [{ text: message, createdAt: new Date(), isRead: false }],
+              },
+            },
+          },
+          { new: true }
+        );
+      }
+  
+      res.status(200).json({ message: "Message added successfully" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  };
+  exports.getChat = async (req, res) => {
+    try {
+        const { userId, friendId } = req.body;
+        console.log("Received request:", req.body);
+
+        if (!userId || !friendId) {
+            console.log("Missing userId or friendId");
+            return res.status(400).json({ error: "User ID and Friend ID are required" });
+        }
+
+        // Find user's chat with friend (sent messages)
+        const user = await User.findById(userId).populate("chats.chatWith");
+        if (!user) {
+            console.log("User not found:", userId);
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        const userChat = user.chats.find(chat => chat.chatWith?.toString() === friendId);
+        const sentMessages = userChat 
+            ? userChat.messages.map(msg => ({
+                ...msg._doc, 
+                sentBy: userId,
+                text: msg.text,
+                createdAt: msg.createdAt,
+                messageType: "sent"
+            }))
+            : [];
+
+        // Find friend's chat with user (received messages)
+        const friend = await User.findById(friendId).populate("chats.chatWith");
+        if (!friend) {
+            console.log("Friend not found:", friendId);
+            return res.status(404).json({ error: "Friend not found" });
+        }
+
+        const friendChat = friend.chats.find(chat => chat.chatWith?.toString() === userId);
+        const receivedMessages = friendChat 
+            ? friendChat.messages.map(msg => ({
+                ...msg._doc, 
+                sentBy: friendId,
+                text: msg.text,
+                createdAt: msg.createdAt,
+                messageType: "received"
+            }))
+            : [];
+
+        const chatMessages = [...receivedMessages, ...sentMessages].sort(
+            (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+        );
+
+        console.log("Total messages:", chatMessages.length);
+        res.status(200).json({ messages: chatMessages ?? [] }); // Ensure it always returns an array
+
+    } catch (error) {
+        console.error("Error in getChat:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+  exports.cancelFriendRequest = async (req, res) => {
+    try {
+      const { senderId, receiverId } = req.body;
+  
+      await User.findByIdAndUpdate(receiverId, {
+        $pull: { friendRequests: senderId },
+      });
+  
+      res.status(200).json({ message: "Friend request canceled successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Error canceling friend request", error });
+    }
+  };
+  

@@ -269,7 +269,7 @@ exports.getPollsByIds = async (req, res) => {
         userid: poll.createdBy._id,
       };
     });
-console.log("😎😎😎😎😎😎",formattedPolls)
+// console.log("😎😎😎😎😎😎",formattedPolls)
     res.status(200).json({polls:formattedPolls});
   } catch (err) {
     console.error("Error fetching polls shared by friend:", err);
@@ -303,34 +303,97 @@ exports.deletePoll = async (req, res) => {
 };
 
 
+// exports.getSharedPolls = async (req, res) => {
+//   try {
+//       const { userId } = req.params;
+
+//       const user = await User.findById(userId)
+//           .populate({
+//               path: "sharedPolls.pollId sharedPolls.sharedPersonId",
+//               select: "title question sharedAt username email profilePic"
+//           });
+
+//       if (!user) {
+//           return res.status(404).json({ message: "User not found" });
+//       }
+
+//       console.log("👼👼👼👼👼 Before filtering");
+//       console.log(user.sharedPolls);
+
+//       const uniqueSharedPolls = user.sharedPolls.filter((poll, index, self) =>
+//           index === self.findIndex((p) => p.sharedPersonId.equals(poll.sharedPersonId))
+//       );
+
+//       console.log("😍😍😍😍😍 After filtering");
+//       console.log(uniqueSharedPolls);
+
+//       res.status(200).json({ sharedPolls: uniqueSharedPolls });
+//   } catch (error) {
+//       console.error("Error fetching shared polls:", error);
+//       res.status(500).json({ message: "Error fetching shared polls", error });
+//   }
+// };
 exports.getSharedPolls = async (req, res) => {
   try {
-      const { userId } = req.params;
+    const { userId } = req.params;
 
-      const user = await User.findById(userId)
-          .populate({
-              path: "sharedPolls.pollId sharedPolls.sharedPersonId",
-              select: "title question sharedAt username email profilePic"
-          });
+    const user = await User.findById(userId)
+      .populate({
+        path: "sharedPolls.pollId sharedPolls.sharedPersonId",
+        select: "title question sharedAt username email profilePic",
+      })
+      .populate({
+        path: "friends",
+        select: "username email profilePic",
+      });
 
-      if (!user) {
-          return res.status(404).json({ message: "User not found" });
-      }
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-      console.log("👼👼👼👼👼 Before filtering");
-      console.log(user.sharedPolls);
+    console.log("👼👼👼👼👼 Before filtering");
+    console.log(user.sharedPolls);
 
-      // Remove duplicates based on sharedPersonId
-      const uniqueSharedPolls = user.sharedPolls.filter((poll, index, self) =>
-          index === self.findIndex((p) => p.sharedPersonId.equals(poll.sharedPersonId))
-      );
+    // Unique shared polls
+    const uniqueSharedPolls = user.sharedPolls.filter((poll, index, self) =>
+      index === self.findIndex((p) => p.sharedPersonId.equals(poll.sharedPersonId))
+    );
 
-      console.log("😍😍😍😍😍 After filtering");
-      console.log(uniqueSharedPolls);
+    console.log("😍😍😍😍😍 After filtering");
+    console.log(uniqueSharedPolls);
 
-      res.status(200).json({ sharedPolls: uniqueSharedPolls });
+    // Collect shared persons' IDs
+    const sharedPersonIds = new Set(uniqueSharedPolls.map(poll => poll.sharedPersonId._id.toString()));
+
+    // Format friends but exclude those who are already in sharedPersonIds
+    const friendsList = user.friends
+      .filter(friend => !sharedPersonIds.has(friend._id.toString()))
+      .map(friend => ({
+        sharedPersonId: {
+          _id: friend._id,
+          username: friend.username,
+          email: friend.email,
+          profilePic: friend.profilePic || "",
+        },
+        isFriend: true, // Identify them as friends in frontend
+      }));
+
+    // Format shared polls
+    const sharedPollsWithFriends = uniqueSharedPolls.map(poll => ({
+      sharedPersonId: poll.sharedPersonId,
+      pollId: poll.pollId,
+      sharedAt: poll.sharedAt,
+      isFriend: false, // Mark as shared poll
+    }));
+
+    // Combine both lists
+    const combinedData = [...sharedPollsWithFriends, ...friendsList];
+
+    res.status(200).json({ sharedPolls: combinedData });
   } catch (error) {
-      console.error("Error fetching shared polls:", error);
-      res.status(500).json({ message: "Error fetching shared polls", error });
+    console.error("Error fetching shared polls:", error);
+    res.status(500).json({ message: "Error fetching shared polls", error });
   }
 };
+
+
