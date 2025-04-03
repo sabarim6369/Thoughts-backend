@@ -115,9 +115,18 @@ exports.votePoll = async (req, res) => {
                 userid: poll.createdBy._id
             };
         });
+        const sortedPolls = formattedPolls.sort((a, b) => {
+            if (a.userVotedOptionIndex === -1 && b.userVotedOptionIndex !== -1) {
+                return -1; 
+            }
+            if (a.userVotedOptionIndex !== -1 && b.userVotedOptionIndex === -1) {
+              return 1; 
+            }
+            return 0; 
+        });
 
         console.log(JSON.stringify(formattedPolls, null, 2));
-        res.status(200).json(formattedPolls);
+        res.status(200).json(sortedPolls);
     } catch (err) {
         console.error("Error fetching polls:", err);
         res.status(500).json({ message: "Error fetching polls." });
