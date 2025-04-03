@@ -358,4 +358,33 @@ exports.chat = async (req, res) => {
       res.status(500).json({ message: "Error canceling friend request", error });
     }
   };
+  exports.isinfriendlist = async (req, res) => {
+    try {
+      const { useridofdifferentuser, myid } = req.body;
+  
+      // Use Promise.all to fetch both users concurrently
+      const [user, thatuser] = await Promise.all([
+        User.findById(myid),
+        User.findById(useridofdifferentuser)
+      ]);
+  
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+  
+      if (!thatuser) {
+        return res.status(404).json({ message: "The other user not found" });
+      }
+  
+      const isFriend = user.friends.includes(useridofdifferentuser);
+      const isinrequest = thatuser.friendRequests.includes(myid);
+  
+      // Debugging
+      console.log("Friend Request Status:", isinrequest);
+  
+      return res.status(200).json({ isfriend: isFriend, isrequested: isinrequest });
+    } catch (err) {
+      res.status(500).json({ message: "Error occurred", error: err.message });
+    }
+  };
   

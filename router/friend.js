@@ -12,4 +12,5 @@ router.get("/list/:userId", friendController.getFriends);
 router.get("/suggestedfriendlist/:userId", friendController.getSuggestedFriends);
 router.post("/chat",friendController.chat)
 router.post("/getchat",friendController.getChat);
+router.post("/isinfriendlist",friendController.isinfriendlist);
 module.exports = router;

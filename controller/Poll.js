@@ -301,6 +301,17 @@ exports.deletePoll = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+exports.getallusers = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const users = await User.find({ _id: { $ne: userId } });
+
+    res.status(200).json({ success: true, users });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
 
 
 // exports.getSharedPolls = async (req, res) => {
