@@ -84,7 +84,6 @@ exports.votePoll = async (req, res) => {
 
         const userObjectId = new mongoose.Types.ObjectId(userId);
 
-        // Fetch all polls except the ones created by the user
         const polls = await Poll.find({ createdBy: { $ne: userObjectId } })
             .populate('createdBy', '_id username email phoneNumber dob friends profilePic');
 
@@ -136,9 +135,8 @@ exports.votePoll = async (req, res) => {
 exports.getSinglePoll = async (req, res) => {
     console.log("Fetching a single poll...");
     try {
-        const { pollId } = req.params; // Get pollId from request params
-        const userId = req.query.userId; // Get userId from query params (for vote check)
-
+        const { pollId } = req.params; 
+        const userId = req.query.userId; 
         console.log("Poll ID:", pollId);
         console.log("User ID:", userId);
 
@@ -371,43 +369,50 @@ exports.getSharedPolls = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    console.log("👼👼👼👼👼 Before filtering");
-    console.log(user.sharedPolls);
+    const getLastChatTime = (chatWithId) => {
+      const chat = user.chats.find(c => c.chatWith.toString() === chatWithId.toString());
+      if (!chat || chat.messages.length === 0) return null;
+      return chat.messages[chat.messages.length - 1].createdAt;
+    };
 
     // Unique shared polls
     const uniqueSharedPolls = user.sharedPolls.filter((poll, index, self) =>
       index === self.findIndex((p) => p.sharedPersonId.equals(poll.sharedPersonId))
     );
 
-    console.log("😍😍😍😍😍 After filtering");
-    console.log(uniqueSharedPolls);
-
-    // Collect shared persons' IDs
     const sharedPersonIds = new Set(uniqueSharedPolls.map(poll => poll.sharedPersonId._id.toString()));
 
-    // Format friends but exclude those who are already in sharedPersonIds
     const friendsList = user.friends
       .filter(friend => !sharedPersonIds.has(friend._id.toString()))
-      .map(friend => ({
-        sharedPersonId: {
-          _id: friend._id,
-          username: friend.username,
-          email: friend.email,
-          profilePic: friend.profilePic || "",
-        },
-        isFriend: true, // Identify them as friends in frontend
-      }));
+      .map(friend => {
+        const chatTime = getLastChatTime(friend._id);
+        return {
+          sharedPersonId: {
+            _id: friend._id,
+            username: friend.username,
+            email: friend.email,
+            profilePic: friend.profilePic || "",
+          },
+          isFriend: true,
+          chatTime: chatTime || new Date(0) // Use old date if no chats
+        };
+      });
 
-    // Format shared polls
-    const sharedPollsWithFriends = uniqueSharedPolls.map(poll => ({
-      sharedPersonId: poll.sharedPersonId,
-      pollId: poll.pollId,
-      sharedAt: poll.sharedAt,
-      isFriend: false, // Mark as shared poll
-    }));
+    const sharedPollsWithFriends = uniqueSharedPolls.map(poll => {
+      const chatTime = getLastChatTime(poll.sharedPersonId._id);
+      return {
+        sharedPersonId: poll.sharedPersonId,
+        pollId: poll.pollId,
+        sharedAt: poll.sharedAt,
+        isFriend: false,
+        chatTime: chatTime || new Date(0)
+      };
+    });
 
-    // Combine both lists
     const combinedData = [...sharedPollsWithFriends, ...friendsList];
+
+    // Sort by recent chatTime
+    combinedData.sort((a, b) => new Date(b.chatTime) - new Date(a.chatTime));
 
     res.status(200).json({ sharedPolls: combinedData });
   } catch (error) {
