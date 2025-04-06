@@ -84,7 +84,7 @@ exports.votePoll = async (req, res) => {
 
         const userObjectId = new mongoose.Types.ObjectId(userId);
 
-        const polls = await Poll.find({ createdBy: { $ne: userObjectId } })
+        const polls = await Poll.find()
             .populate('createdBy', '_id username email phoneNumber dob friends profilePic');
 
         console.log("❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥❤️‍🔥");
@@ -130,6 +130,50 @@ exports.votePoll = async (req, res) => {
         console.error("Error fetching polls:", err);
         res.status(500).json({ message: "Error fetching polls." });
     }
+};
+exports.getTopPolls = async (req, res) => {
+  console.log("Fetching top polls...");
+  try {
+    const userId = req.params.userId;
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+
+    const polls = await Poll.find()
+      .populate('createdBy', '_id username email phoneNumber dob friends profilePic');
+
+    const formattedPolls = polls.map(poll => {
+      const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
+
+      const userVote = poll.votedUsers.find(vote => vote.userId.toString() === userId);
+      const userVotedOptionIndex = userVote ? userVote.option : -1;
+
+      const optionsWithVotes = poll.options.map((option, index) => ({
+        text: option.text,
+        votes: option.votes,
+        marked: index === userVotedOptionIndex,
+      }));
+
+      return {
+        id: poll._id.toString(),
+        user: poll.createdBy.username,
+        question: poll.question,
+        options: optionsWithVotes,
+        totalVotes,
+        userVotedOptionIndex,
+        profileImage: poll.createdBy.profilePic || "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+        userid: poll.createdBy._id
+      };
+    });
+
+    // Sort by total votes in descending order and take top 10
+    const topPolls = formattedPolls
+      .sort((a, b) => b.totalVotes - a.totalVotes)
+      .slice(0, 10);
+
+    res.status(200).json(topPolls);
+  } catch (err) {
+    console.error("Error fetching top polls:", err);
+    res.status(500).json({ message: "Error fetching top polls." });
+  }
 };
 
 exports.getSinglePoll = async (req, res) => {

@@ -1,5 +1,5 @@
 const express = require("express");
-const { createPoll, votePoll,getallpollofuser,getallpoll,sharePoll,getPollsByIds,deletePoll,getSharedPolls,getSinglePoll,getallusers} = require("../controller/Poll");
+const { createPoll, votePoll,getallpollofuser,getallpoll,sharePoll,getPollsByIds,deletePoll,getSharedPolls,getSinglePoll,getallusers,getTopPolls} = require("../controller/Poll");
 
 const router = express.Router();
 
@@ -8,6 +8,8 @@ router.post("/vote", votePoll);
 router.post("/sharepoll", sharePoll);
 router.get("/getPolls/:userId",getallpollofuser)
 router.get("/getallPolls/:userId",getallpoll)
+router.get('/top10/:userId', getTopPolls);
+
 router.post("/getPollswithids",getPollsByIds);
 router.delete("/deletepoll/:pollId", deletePoll);
 router.get("/shared-polls/:userId", getSharedPolls);
