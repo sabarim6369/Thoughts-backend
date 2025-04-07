@@ -111,7 +111,8 @@ exports.votePoll = async (req, res) => {
                 options: optionsWithVotes,
                 userVotedOptionIndex, // Send the user's voted option index
                 profileImage: poll.createdBy.profilePic || "https://cdn-icons-png.flaticon.com/512/149/149071.png",
-                userid: poll.createdBy._id
+                userid: poll.createdBy._id,
+                createdAt: poll.createdAt,
             };
         });
         const sortedPolls = formattedPolls.sort((a, b) => {
