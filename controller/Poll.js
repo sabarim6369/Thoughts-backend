@@ -215,7 +215,9 @@ exports.getSinglePoll = async (req, res) => {
             question: poll.question,
             options: optionsWithVotes,
             profileImage: poll.createdBy.profilePic || "https://cdn-icons-png.flaticon.com/512/149/149071.png",
-            userid: poll.createdBy._id
+            userid: poll.createdBy._id,
+            createdAt: poll.createdAt,
+            
         };
 
         console.log("🟢 Single Poll Response:", JSON.stringify(formattedPoll, null, 2));

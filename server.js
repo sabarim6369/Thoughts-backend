@@ -5,7 +5,7 @@ const dotenv = require("dotenv");
 const authRoutes = require("./router/auth");
 const pollRoutes = require("./router/poll");
 const friendRoutes = require("./router/friend");
-
+const reportroutes=require("./router/report")
 dotenv.config();
 
 const app = express();
@@ -20,6 +20,7 @@ app.use(cors());
 app.use("/api/auth", authRoutes);
 app.use("/api/poll", pollRoutes);
 app.use("/api/friend", friendRoutes);
+app.use("/api/report",reportroutes);
 
 mongoose
   .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
