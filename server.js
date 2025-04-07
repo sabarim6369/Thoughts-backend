@@ -17,10 +17,10 @@ app.use("/uploads", express.static("uploads"));
 
 app.use(cors());
 
-app.use("/api/auth", authRoutes);
-app.use("/api/poll", pollRoutes);
-app.use("/api/friend", friendRoutes);
-app.use("/api/report",reportroutes);
+app.use("/auth", authRoutes);
+app.use("/poll", pollRoutes);
+app.use("/friend", friendRoutes);
+app.use("/report",reportroutes);
 
 mongoose
   .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
