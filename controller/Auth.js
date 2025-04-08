@@ -263,11 +263,10 @@ app.use(express.urlencoded({ extended: true }));
 const cloudinary = require("cloudinary").v2;
 // const User = require("../models/userschema");
 
-// Configure Cloudinary
 cloudinary.config({
-  cloud_name:"dsq0ebnj6",
-  api_key:"693565251951853",
-  api_secret:"Fk3XYttHytn_Dy_J2t6hyDtYigM",
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
 
@@ -285,11 +284,12 @@ const uploadToCloudinary = async (filePath) => {
   });
 };
 exports.uploadProfilePic = async (req, res) => {
+  console.log(req.body)
+
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
-console.log(req.body)
     const userId = req.body.userId;
     const filePath = req.file.path; // Local file path
 
