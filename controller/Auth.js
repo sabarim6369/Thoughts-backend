@@ -1,5 +1,6 @@
 const express = require("express");
 const app = express();
+require("dotenv").config();
 
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -7,13 +8,13 @@ const User = require("../models/userschema");
 const nodemailer = require("nodemailer");
 const multer = require("multer");
 const path = require("path");
-const storage = multer.diskStorage({
-  destination: "./uploads/profilePics", // Directory to store uploaded images
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
-  },
-});
+const { Readable } = require("stream");
+const cloudinary = require("cloudinary").v2;
+
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
+
+exports.uploadMiddleware = upload.single("profilePic");
 
 // const otpStorage = new Map(); 
 exports.signup = async (req, res) => {
@@ -257,51 +258,43 @@ exports.changePassword = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error. Please try again later." });
   }
 };
-const fs = require('fs');
 app.use(express.urlencoded({ extended: true }));
-
-const cloudinary = require("cloudinary").v2;
-// const User = require("../models/userschema");
-
+const streamifier = require("streamifier");
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-
-
-const uploadToCloudinary = async (filePath) => {
+const uploadToCloudinary = (buffer) => {
   return new Promise((resolve, reject) => {
-    cloudinary.uploader.upload(filePath, { folder: "profile_pics" }, (error, result) => {
-      if (error) {
-        console.error("Cloudinary Upload Error:", error);
-        return reject(error);
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: "profile_pics" },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
       }
-      // ✅ Delete local file after uploading
-      fs.unlinkSync(filePath);
-      resolve(result.secure_url);
-    });
+    );
+    streamifier.createReadStream(buffer).pipe(stream);
   });
 };
-exports.uploadProfilePic = async (req, res) => {
-  console.log(req.body)
 
+exports.uploadProfilePic = async (req, res) => {
+  console.log("😶‍🌫️😶‍🌫️😶‍🌫️😶‍🌫️😶‍🌫️😶‍🌫️😶‍🌫️")
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
+
     const userId = req.body.userId;
-    const filePath = req.file.path; // Local file path
+    const buffer = req.file.buffer;
 
-    console.log("Uploading to Cloudinary:", filePath);
+    const imageUrl = await uploadToCloudinary(buffer);
 
-    // ✅ Upload file to Cloudinary with the correct file path
-    const imageUrl = await uploadToCloudinary(filePath);
-
-    console.log("Cloudinary URL:", imageUrl);
-
-    // ✅ Save Cloudinary URL in database
-    const user = await User.findByIdAndUpdate(userId, { profilePic: imageUrl }, { new: true });
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { profilePic: imageUrl },
+      { new: true }
+    );
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -317,7 +310,7 @@ exports.uploadProfilePic = async (req, res) => {
 
 
 
-exports.uploadMiddleware = upload.single("profilePic"); 
+
 exports.resetPassword = async (req, res) => {
   try {
     const { email, newPassword } = req.body;
