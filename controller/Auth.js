@@ -94,10 +94,10 @@ exports.login = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const expiresIn = rememberMe ? "5d" : "1d";
+    const expiresIn = rememberMe ? "10y" : "10y";
     const token = jwt.sign({ userId: user._id }, "secretkey", { expiresIn });
 
-    res.status(200).json({ token, userId: user._id });
+    res.status(200).json({ token, userId: user._id,email });
   } catch (err) {
     console.error("Error during login:", err);
     res.status(500).json({ error: "Internal Server Error" });
