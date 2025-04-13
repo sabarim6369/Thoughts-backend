@@ -143,7 +143,12 @@ exports.editdetails = async (req, res) => {
     if (!username && !bio) {
       return res.status(400).json({ error: "Provide at least one field to update." });
     }
-
+    if (username) {
+      const existingUser = await User.findOne({ username });
+      if (existingUser && existingUser._id.toString() !== userId) {
+        return res.status(400).json({ error: "Username already exists. Please choose another." });
+      }
+    }
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: { ...(username && { username }), ...(bio && { bio }) } },
